@@ -15,13 +15,23 @@ pipeline {
 
         stage('Install dependencies') {
             steps {
-                sh 'docker run --rm -v "$WORKSPACE":/app -w /app node:20-alpine npm install'
+                sh '''
+                    docker run --rm \
+                      -v /home/dk/jenkins-ci-lab/jenkins_home/workspace/$JOB_NAME:/app \
+                      -w /app \
+                      node:20-alpine npm install
+                '''
             }
         }
 
         stage('Test') {
             steps {
-                sh 'docker run --rm -v "$WORKSPACE":/app -w /app node:20-alpine npm test'
+                sh '''
+                    docker run --rm \
+                      -v /home/dk/jenkins-ci-lab/jenkins_home/workspace/$JOB_NAME:/app \
+                      -w /app \
+                      node:20-alpine npm test
+                '''
             }
         }
 
@@ -35,6 +45,7 @@ pipeline {
             steps {
                 sh '''
                     docker rm -f $CONTAINER_NAME || true
+
                     docker run -d \
                       --name $CONTAINER_NAME \
                       -p 3000:3000 \
