@@ -41,19 +41,34 @@ pipeline {
                 sh 'docker build -t $IMAGE_NAME:$BUILD_NUMBER .'
             }
         }
-	
-	stage('Push Registry') {
-    steps {
-        sh '''
-            docker tag \
-              $IMAGE_NAME:$BUILD_NUMBER \
-              $REGISTRY/$IMAGE_NAME:$BUILD_NUMBER
 
-            docker push \
-              $REGISTRY/$IMAGE_NAME:$BUILD_NUMBER
-        '''
-    }
-}	
+	stage('Push Registry') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'docker-registry-credentials',
+                        usernameVariable: 'REGISTRY_USER',
+                        passwordVariable: 'REGISTRY_PASS'
+                    )
+                ]) {
+                    sh '''
+                        echo "$REGISTRY_PASS" | docker login \
+                          $REGISTRY \
+                          -u "$REGISTRY_USER" \
+                          --password-stdin
+
+                        docker tag \
+                          $IMAGE_NAME:$BUILD_NUMBER \
+                          $REGISTRY/$IMAGE_NAME:$BUILD_NUMBER
+
+                        docker push \
+                          $REGISTRY/$IMAGE_NAME:$BUILD_NUMBER
+
+                        docker logout $REGISTRY
+                    '''
+                }
+            }
+        }
 
         stage('Deploy') {
             steps {
