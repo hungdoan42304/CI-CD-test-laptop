@@ -4,7 +4,7 @@ pipeline {
     environment {
         IMAGE_NAME = "sample-ci-app"
         CONTAINER_NAME = "sample-ci-app"
-	REGISTRY = "172.22.0.1:5000"
+	REGISTRY = "192.168.232.170/jenkins-ci"
     }
 
     stages {
@@ -46,7 +46,7 @@ pipeline {
             steps {
                 withCredentials([
                     usernamePassword(
-                        credentialsId: 'docker-registry-credentials',
+                        credentialsId: 'harbor-jenkins-credentials',
                         usernameVariable: 'REGISTRY_USER',
                         passwordVariable: 'REGISTRY_PASS'
                     )
