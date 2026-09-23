@@ -4,6 +4,7 @@ pipeline {
     environment {
         IMAGE_NAME = "sample-ci-app"
         CONTAINER_NAME = "sample-ci-app"
+	REGISTRY = "172.22.0.1:5000"
     }
 
     stages {
@@ -40,6 +41,19 @@ pipeline {
                 sh 'docker build -t $IMAGE_NAME:$BUILD_NUMBER .'
             }
         }
+	
+	stage('Push Registry') {
+    steps {
+        sh '''
+            docker tag \
+              $IMAGE_NAME:$BUILD_NUMBER \
+              $REGISTRY/$IMAGE_NAME:$BUILD_NUMBER
+
+            docker push \
+              $REGISTRY/$IMAGE_NAME:$BUILD_NUMBER
+        '''
+    }
+}	
 
         stage('Deploy') {
             steps {
