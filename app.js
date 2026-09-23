@@ -4,7 +4,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.get("/", (req, res) => {
-  res.send("CI/CD deployment successful!");
+  res.send("CI/CD automated by Jenkins Poll SCM!");
 });
 
 app.listen(port, () => {
