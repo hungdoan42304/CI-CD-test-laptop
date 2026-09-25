@@ -97,5 +97,9 @@ pipeline {
         failure {
             echo 'Pipeline failed. Review the console output.'
         }
+
+        always {
+            cleanWs()
+        }
     }
 }
