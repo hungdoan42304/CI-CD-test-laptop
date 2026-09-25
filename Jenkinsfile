@@ -1,6 +1,10 @@
 pipeline {
     agent any
-
+    
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '5'))
+    }    
+		
     environment {
         IMAGE_NAME = "sample-ci-app"
         CONTAINER_NAME = "sample-ci-app"
