@@ -8,8 +8,10 @@ pipeline {
     environment {
         IMAGE_NAME = "sample-ci-app"
         REGISTRY = "192.168.232.170/jenkins-ci"
-        K8S_NAMESPACE = "cicd-lab"
-        K8S_DEPLOYMENT = "sample-ci-app"
+
+        GITOPS_REPO = "https://github.com/Hungsky123456/CI-CD-test-laptop-gitops.git"
+        GITOPS_BRANCH = "main"
+        GITOPS_MANIFEST = "k8s/deployment.yaml"
     }
 
     stages {
@@ -78,25 +80,45 @@ pipeline {
             }
         }
 
-        stage('Deploy Kubernetes') {
+        stage('Update GitOps Repository') {
             steps {
                 withCredentials([
-                    file(
-                        credentialsId: 'k8s-jenkins-kubeconfig',
-                        variable: 'KUBECONFIG'
+                    usernamePassword(
+                        credentialsId: 'github-gitops-credentials',
+                        usernameVariable: 'GIT_USER',
+                        passwordVariable: 'GIT_TOKEN'
                     )
                 ]) {
                     sh '''
-                        echo "Deploying image:"
-                        echo "$REGISTRY/$IMAGE_NAME:$BUILD_NUMBER"
+                        set -e
 
-                        kubectl -n $K8S_NAMESPACE set image \
-                          deployment/$K8S_DEPLOYMENT \
-                          sample-ci-app=$REGISTRY/$IMAGE_NAME:$BUILD_NUMBER
+                        rm -rf gitops-repo
 
-                        kubectl -n $K8S_NAMESPACE rollout status \
-                          deployment/$K8S_DEPLOYMENT \
-                          --timeout=120s
+                        git clone \
+                          --branch "$GITOPS_BRANCH" \
+                          "https://${GIT_USER}:${GIT_TOKEN}@github.com/Hungsky123456/CI-CD-test-laptop-gitops.git" \
+                          gitops-repo
+
+                        cd gitops-repo
+
+                        sed -i \
+                          "s|image: 192.168.232.170/jenkins-ci/sample-ci-app:.*|image: $REGISTRY/$IMAGE_NAME:$BUILD_NUMBER|" \
+                          "$GITOPS_MANIFEST"
+
+                        echo "Updated manifest:"
+                        grep "image:" "$GITOPS_MANIFEST"
+
+                        git config user.name "Jenkins CI"
+                        git config user.email "jenkins@lab.local"
+
+                        git add "$GITOPS_MANIFEST"
+
+                        if git diff --cached --quiet; then
+                            echo "No GitOps manifest change detected."
+                        else
+                            git commit -m "Deploy sample-ci-app build $BUILD_NUMBER"
+                            git push origin "$GITOPS_BRANCH"
+                        fi
                     '''
                 }
             }
@@ -105,7 +127,7 @@ pipeline {
 
     post {
         success {
-            echo 'CI/CD completed: image pushed to Harbor and deployed to Kubernetes.'
+            echo 'CI completed: image pushed to Harbor and GitOps desired state updated.'
         }
 
         failure {
