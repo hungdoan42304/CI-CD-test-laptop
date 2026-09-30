@@ -22,7 +22,7 @@ spec:
 
       containers:
         - name: sample-ci-app
-          image: 192.168.232.170/jenkins-ci/sample-ci-app:20
+          image: 192.168.232.170/jenkins-ci/sample-ci-app:22
           imagePullPolicy: Always
 
           ports:
