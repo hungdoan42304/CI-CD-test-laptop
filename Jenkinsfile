@@ -8,10 +8,8 @@ pipeline {
     environment {
         IMAGE_NAME = "sample-ci-app"
         REGISTRY = "192.168.232.170/jenkins-ci"
-
-        GITOPS_REPO = "https://github.com/Hungsky123456/CI-CD-test-laptop-gitops.git"
-        GITOPS_BRANCH = "main"
-        GITOPS_MANIFEST = "k8s/deployment.yaml"
+        GIT_BRANCH_NAME = "main"
+        GIT_MANIFEST = "k8s/deployment.yaml"
     }
 
     stages {
@@ -21,7 +19,33 @@ pipeline {
             }
         }
 
+        stage('Check Commit') {
+            steps {
+                script {
+                    env.LAST_COMMIT_AUTHOR = sh(
+                        script: 'git log -1 --pretty=%an',
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Last commit author: ${env.LAST_COMMIT_AUTHOR}"
+
+                    if (env.LAST_COMMIT_AUTHOR == 'Jenkins CI') {
+                        env.SKIP_CI = 'true'
+                        echo 'Commit was created by Jenkins CI. Skipping CI stages.'
+                    } else {
+                        env.SKIP_CI = 'false'
+                    }
+                }
+            }
+        }
+
         stage('Install dependencies') {
+            when {
+                expression {
+                    env.SKIP_CI != 'true'
+                }
+            }
+
             steps {
                 sh '''
                     docker run --rm \
@@ -33,6 +57,12 @@ pipeline {
         }
 
         stage('Test') {
+            when {
+                expression {
+                    env.SKIP_CI != 'true'
+                }
+            }
+
             steps {
                 sh '''
                     docker run --rm \
@@ -44,6 +74,12 @@ pipeline {
         }
 
         stage('Build Docker image') {
+            when {
+                expression {
+                    env.SKIP_CI != 'true'
+                }
+            }
+
             steps {
                 sh '''
                     docker build \
@@ -53,6 +89,12 @@ pipeline {
         }
 
         stage('Push Harbor') {
+            when {
+                expression {
+                    env.SKIP_CI != 'true'
+                }
+            }
+
             steps {
                 withCredentials([
                     usernamePassword(
@@ -80,11 +122,17 @@ pipeline {
             }
         }
 
-        stage('Update GitOps Repository') {
+        stage('Update GitOps Manifest') {
+            when {
+                expression {
+                    env.SKIP_CI != 'true'
+                }
+            }
+
             steps {
                 withCredentials([
                     usernamePassword(
-                        credentialsId: 'github-gitops-credentials',
+                        credentialsId: 'github-ci-cd-credentials',
                         usernameVariable: 'GIT_USER',
                         passwordVariable: 'GIT_TOKEN'
                     )
@@ -92,32 +140,27 @@ pipeline {
                     sh '''
                         set -e
 
-                        rm -rf gitops-repo
-
-                        git clone \
-                          --branch "$GITOPS_BRANCH" \
-                          "https://${GIT_USER}:${GIT_TOKEN}@github.com/Hungsky123456/CI-CD-test-laptop-gitops.git" \
-                          gitops-repo
-
-                        cd gitops-repo
-
                         sed -i \
-                          "s|image: 192.168.232.170/jenkins-ci/sample-ci-app:.*|image: $REGISTRY/$IMAGE_NAME:$BUILD_NUMBER|" \
-                          "$GITOPS_MANIFEST"
+                          "s|image: $REGISTRY/$IMAGE_NAME:.*|image: $REGISTRY/$IMAGE_NAME:$BUILD_NUMBER|" \
+                          "$GIT_MANIFEST"
 
                         echo "Updated manifest:"
-                        grep "image:" "$GITOPS_MANIFEST"
+                        grep "image:" "$GIT_MANIFEST"
 
                         git config user.name "Jenkins CI"
                         git config user.email "jenkins@lab.local"
 
-                        git add "$GITOPS_MANIFEST"
+                        git add "$GIT_MANIFEST"
 
                         if git diff --cached --quiet; then
-                            echo "No GitOps manifest change detected."
+                            echo "No manifest change detected."
                         else
-                            git commit -m "Deploy sample-ci-app build $BUILD_NUMBER"
-                            git push origin "$GITOPS_BRANCH"
+                            git commit \
+                              -m "Update sample-ci-app to build $BUILD_NUMBER [skip ci]"
+
+                            git push \
+                              "https://${GIT_USER}:${GIT_TOKEN}@github.com/hungdoan42304/CI-CD-test-laptop.git" \
+                              HEAD:$GIT_BRANCH_NAME
                         fi
                     '''
                 }
@@ -127,7 +170,7 @@ pipeline {
 
     post {
         success {
-            echo 'CI completed: image pushed to Harbor and GitOps desired state updated.'
+            echo 'Pipeline completed successfully.'
         }
 
         failure {

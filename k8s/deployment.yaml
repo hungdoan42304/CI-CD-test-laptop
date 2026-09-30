@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-ci-app
+  namespace: cicd-lab
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: sample-ci-app
+
+  template:
+    metadata:
+      labels:
+        app: sample-ci-app
+
+    spec:
+      imagePullSecrets:
+        - name: harbor-pull-secret
+
+      containers:
+        - name: sample-ci-app
+          image: 192.168.232.170/jenkins-ci/sample-ci-app:20
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 3000
+
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
